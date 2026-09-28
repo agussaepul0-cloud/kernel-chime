@@ -1,0 +1,144 @@
+name: Kernel_Lilium-Chime-Clean
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc libncurses5-dev libssl-dev bison flex libelf-dev git ccache zip gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+
+      - name: Clone Kernel Source & Toolchain
+        run: |
+          git clone --depth=1 https://github.com/liliumproject/kernel_xiaomi_chime.git -b ursinia kernel
+          git clone https://github.com/kdrag0n/proton-clang --depth=1 clang
+
+      - name: Configure Kernel
+        run: |
+          cd kernel
+
+          export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
+          export ARCH=arm64
+          export SUBARCH=arm64
+
+          MAKE_ARGS=(
+            CC=clang
+            LLVM=1
+            CROSS_COMPILE=aarch64-linux-gnu-
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          )
+
+          # Bersihkan direktori output
+          rm -rf out
+          mkdir -p out
+
+          # 1. Load Defconfig Bengal-Perf
+          make O=out "${MAKE_ARGS[@]}" vendor/bengal-perf_defconfig
+
+          # 2. Konfigurasi Dasar USB dan Wireless Aman
+          scripts/config --file out/.config --enable CONFIG_NET
+          scripts/config --file out/.config --enable CONFIG_WIRELESS
+          scripts/config --file out/.config --enable CONFIG_WLAN
+          scripts/config --file out/.config --enable CONFIG_CFG80211
+          scripts/config --file out/.config --enable CONFIG_MAC80211
+          scripts/config --file out/.config --enable CONFIG_USB_SUPPORT
+          scripts/config --file out/.config --enable CONFIG_USB
+          scripts/config --file out/.config --enable CONFIG_USB_OTG
+
+          # 3. Aktifkan DT2W secara Default di Level Kernel
+          scripts/config --file out/.config --enable CONFIG_TOUCHSCREEN_DOUBLE_TAP
+
+          # 4. Regenerasi Kconfig Dependensi
+          make O=out "${MAKE_ARGS[@]}" olddefconfig
+
+          # 5. Kompilasi Kernel Image & DTB
+          make -j$(nproc --all) O=out "${MAKE_ARGS[@]}" Image dtbs dtbo.img || make -j$(nproc --all) O=out "${MAKE_ARGS[@]}" Image
+
+      - name: Repack Installer AnyKernel3
+        run: |
+          git clone https://github.com/osm0sis/AnyKernel3 --depth=1 AnyKernel3
+
+          # Salin Image Kernel
+          if [ -f kernel/out/arch/arm64/boot/Image ]; then
+            cp kernel/out/arch/arm64/boot/Image AnyKernel3/Image
+          else
+            echo "Error: Image file not found!" && exit 1
+          fi
+
+          # Salin file DTB
+          if [ -f kernel/out/arch/arm64/boot/dtb.img ]; then
+            cp kernel/out/arch/arm64/boot/dtb.img AnyKernel3/dtb
+          elif [ -f kernel/out/arch/arm64/boot/dtb ]; then
+            cp kernel/out/arch/arm64/boot/dtb AnyKernel3/dtb
+          elif [ -f kernel/out/arch/arm64/boot/dts/vendor/qcom/bengal.dtb ]; then
+            cp kernel/out/arch/arm64/boot/dts/vendor/qcom/bengal.dtb AnyKernel3/dtb
+          elif [ -f kernel/out/arch/arm64/boot/dts/qcom/bengal.dtb ]; then
+            cp kernel/out/arch/arm64/boot/dts/qcom/bengal.dtb AnyKernel3/dtb
+          fi
+
+          [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/dtbo.img
+
+          cd AnyKernel3
+
+          cat << 'EOF' > anykernel.sh
+          ### AnyKernel3 Ramdisk Mod Script
+          ## osm0sis @ xda-developers
+
+          ### AnyKernel setup
+          # begin properties
+          properties() { '
+          kernel.string=Lilium-Chime Kernel
+          do.devicecheck=0
+          do.modules=0
+          do.systemless=1
+          do.cleanup=1
+          do.cleanuponabort=0
+          supported.versions=
+          supported.patchlevels=
+          '; } # end properties
+
+          ## Boot Shell Variables
+          if [ -b /dev/block/by-name/boot ]; then
+            block=/dev/block/by-name/boot;
+          elif [ -b /dev/block/bootdevice/by-name/boot ]; then
+            block=/dev/block/bootdevice/by-name/boot;
+          else
+            block=auto;
+          fi
+
+          is_slot_device=0;
+          ramdisk_compression=auto;
+          patch_vbmeta_flag=auto;
+
+          . tools/ak3-core.sh && attributes;
+
+          dump_boot;
+
+          # Service Double Tap To Wake (DT2W) Auto Enable
+          if [ -d /data/adb/service.d ]; then
+            echo '#!/system/bin/sh' > /data/adb/service.d/dt2w.sh
+            echo 'sleep 5' >> /data/adb/service.d/dt2w.sh
+            echo 'echo 1 > /sys/touchpanel/double_tap' >> /data/adb/service.d/dt2w.sh
+            chmod 755 /data/adb/service.d/dt2w.sh
+          fi
+
+          write_boot;
+          EOF
+
+          chmod -R 755 tools/
+          zip -r9 Kernel_Lilium-Chime-Clean.zip * -x .git README.md
+
+      - name: Upload Kernel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kernel_Lilium-Chime-Clean
+          path: AnyKernel3/Kernel_Lilium-Chime-Clean.zip
