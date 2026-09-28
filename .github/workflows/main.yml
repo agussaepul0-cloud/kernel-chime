@@ -1,4 +1,4 @@
-name: Kernel_Lilium-Chime-Experimental
+name: Kernel_Lilium-Chime-Final
 on:
   workflow_dispatch:
 
@@ -15,13 +15,14 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bc libncurses5-dev libssl-dev bison flex libelf-dev git ccache zip gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+          sudo apt-get install -y build-essential bc libncurses5-dev libssl-dev bison flex libelf-dev git ccache zip gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi binutils-aarch64-linux-gnu binutils-arm-linux-gnueabi
 
-      - name: Clone Kernel Source, QCOM, & Experimental Clang
+      - name: Clone Toolchain, LLVM, QCOM & Kernel Source
         run: |
+          git clone --depth=1 https://github.com/liliumproject/clang.git clang
+          git clone --depth=1 https://github.com/liliumproject/llvm-project.git clang/llvm-project
           git clone --depth=1 https://github.com/liliumproject/kernel_xiaomi_chime.git -b ursinia kernel
           git clone --depth=1 https://github.com/liliumproject/kernel_qcom.git kernel/kernel/qcom
-          git clone --depth=1 https://github.com/liliumproject/clang-experimental.git clang
 
       - name: Configure Kernel
         run: |
@@ -33,6 +34,13 @@ jobs:
 
           MAKE_ARGS=(
             CC=clang
+            LD=ld.lld
+            AR=llvm-ar
+            AS=llvm-as
+            NM=llvm-nm
+            OBJCOPY=llvm-objcopy
+            OBJDUMP=llvm-objdump
+            STRIP=llvm-strip
             LLVM=1
             CROSS_COMPILE=aarch64-linux-gnu-
             CROSS_COMPILE_ARM32=arm-linux-gnueabi-
@@ -97,7 +105,7 @@ jobs:
           ### AnyKernel setup
           # begin properties
           properties() { '
-          kernel.string=Lilium-Chime-Experimental
+          kernel.string=Lilium-Chime-Final
           do.devicecheck=0
           do.modules=0
           do.systemless=1
@@ -136,10 +144,10 @@ jobs:
           EOF
 
           chmod -R 755 tools/
-          zip -r9 Kernel_Lilium-Chime-Experimental.zip * -x .git README.md
+          zip -r9 Kernel_Lilium-Chime-Final.zip * -x .git README.md
 
       - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel_Lilium-Chime-Experimental
-          path: AnyKernel3/Kernel_Lilium-Chime-Experimental.zip
+          name: Kernel_Lilium-Chime-Final
+          path: AnyKernel3/Kernel_Lilium-Chime-Final.zip
