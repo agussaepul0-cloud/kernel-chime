@@ -20,7 +20,13 @@ jobs:
       - name: Clone Toolchain, LLVM, QCOM & Kernel Source
         run: |
           git clone --depth=1 https://github.com/liliumproject/clang.git clang
-          git clone --depth=1 https://github.com/liliumproject/llvm-project.git clang/llvm
+          git clone --depth=1 https://github.com/liliumproject/llvm-project.git llvm-src
+          
+          # Menggabungkan biner LLVM ke dalam folder bin clang agar ld.lld & llvm-objdump terbaca sempurna
+          if [ -d "llvm-src/bin" ]; then
+            cp -rf llvm-src/bin/* clang/bin/
+          fi
+          
           git clone --depth=1 https://github.com/liliumproject/kernel_xiaomi_chime.git -b ursinia kernel
           git clone --depth=1 https://github.com/liliumproject/kernel_qcom.git kernel/kernel/qcom
 
