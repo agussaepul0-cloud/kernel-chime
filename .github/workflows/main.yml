@@ -26,6 +26,9 @@ jobs:
         run: |
           cd kernel
 
+          # Hapus paksa folder atau sisa konfigurasi driver nethunter/rt5370 yang bikin error Makefile
+          rm -rf drivers/nethunter drivers/net/wireless/nethunter drivers/rt5370
+
           export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
           export ARCH=arm64
           export SUBARCH=arm64
