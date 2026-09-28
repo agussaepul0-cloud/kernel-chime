@@ -1,4 +1,4 @@
-name: Kernel_Lilium-Chime-Clean
+name: Kernel_Lilium-Chime-Experimental
 on:
   workflow_dispatch:
 
@@ -17,10 +17,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential bc libncurses5-dev libssl-dev bison flex libelf-dev git ccache zip gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
 
-      - name: Clone Kernel Source & Toolchain
+      - name: Clone Kernel Source, QCOM, & Experimental Clang
         run: |
           git clone --depth=1 https://github.com/liliumproject/kernel_xiaomi_chime.git -b ursinia kernel
-          git clone https://github.com/kdrag0n/proton-clang --depth=1 clang
+          git clone --depth=1 https://github.com/liliumproject/kernel_qcom.git kernel/kernel/qcom
+          git clone --depth=1 https://github.com/liliumproject/clang-experimental.git clang
 
       - name: Configure Kernel
         run: |
@@ -60,8 +61,8 @@ jobs:
           # 4. Regenerasi Kconfig Dependensi
           make O=out "${MAKE_ARGS[@]}" olddefconfig
 
-          # 5. Kompilasi khusus Image dan DTB (melewati error modul drivers luar)
-          make -j$(nproc --all) O=out "${MAKE_ARGS[@]}" Image dtbs || make -j$(nproc --all) O=out "${MAKE_ARGS[@]}" Image
+          # 5. Kompilasi Kernel Image & DTB
+          make -j$(nproc --all) O=out "${MAKE_ARGS[@]}" Image dtbs
 
       - name: Repack Installer AnyKernel3
         run: |
@@ -96,7 +97,7 @@ jobs:
           ### AnyKernel setup
           # begin properties
           properties() { '
-          kernel.string=Lilium-Chime Kernel
+          kernel.string=Lilium-Chime-Experimental
           do.devicecheck=0
           do.modules=0
           do.systemless=1
@@ -135,10 +136,10 @@ jobs:
           EOF
 
           chmod -R 755 tools/
-          zip -r9 Kernel_Lilium-Chime-Clean.zip * -x .git README.md
+          zip -r9 Kernel_Lilium-Chime-Experimental.zip * -x .git README.md
 
       - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel_Lilium-Chime-Clean
-          path: AnyKernel3/Kernel_Lilium-Chime-Clean.zip
+          name: Kernel_Lilium-Chime-Experimental
+          path: AnyKernel3/Kernel_Lilium-Chime-Experimental.zip
