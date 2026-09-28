@@ -26,9 +26,6 @@ jobs:
         run: |
           cd kernel
 
-          # Hapus paksa folder atau sisa konfigurasi driver nethunter/rt5370 yang bikin error Makefile
-          rm -rf drivers/nethunter drivers/net/wireless/nethunter drivers/rt5370
-
           export PATH="$GITHUB_WORKSPACE/clang/bin:$PATH"
           export ARCH=arm64
           export SUBARCH=arm64
@@ -63,8 +60,8 @@ jobs:
           # 4. Regenerasi Kconfig Dependensi
           make O=out "${MAKE_ARGS[@]}" olddefconfig
 
-          # 5. Kompilasi Kernel Image & DTB
-          make -j$(nproc --all) O=out "${MAKE_ARGS[@]}" Image dtbs dtbo.img || make -j$(nproc --all) O=out "${MAKE_ARGS[@]}" Image
+          # 5. Kompilasi khusus Image dan DTB (melewati error modul drivers luar)
+          make -j$(nproc --all) O=out "${MAKE_ARGS[@]}" Image dtbs || make -j$(nproc --all) O=out "${MAKE_ARGS[@]}" Image
 
       - name: Repack Installer AnyKernel3
         run: |
